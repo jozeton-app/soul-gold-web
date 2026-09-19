@@ -102,7 +102,7 @@ app.innerHTML = `
   <div style="max-width: 1200px; margin: 20px auto; padding: 0 16px;">
     <header style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #334155; padding-bottom: 16px; margin-bottom: 20px;">
       <div style="display: flex; align-items: center; gap: 14px;">
-        <img src="/soulgold_icon.png" style="width: 48px; height: 48px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);" alt="SoulGold Logo" />
+        <img src="./soulgold_icon.png" style="width: 48px; height: 48px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);" alt="SoulGold Logo" />
         <div>
           <h1 style="margin: 0; font-size: 1.6rem; color: #facc15; font-weight: 700;">Pokémon SoulGold Save Editor</h1>
           <div style="font-size: 0.85rem; color: #94a3b8; font-weight: 500; margin-top: 2px;">By Jozeton</div>
