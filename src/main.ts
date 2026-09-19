@@ -105,7 +105,10 @@ app.innerHTML = `
         <img src="./soulgold_icon.png" style="width: 48px; height: 48px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);" alt="SoulGold Logo" />
         <div>
           <h1 style="margin: 0; font-size: 1.6rem; color: #facc15; font-weight: 700;">Pokémon SoulGold Save Editor</h1>
-          <div style="font-size: 0.85rem; color: #94a3b8; font-weight: 500; margin-top: 2px;">By Jozeton</div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+            <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 500;">By Jozeton</span>
+            <button id="btn-kofi" style="background: #291938; color: #ff5e5b; border: 1px solid #ff5e5b; padding: 2px 10px; border-radius: 12px; cursor: pointer; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">☕ Support on Ko-fi</button>
+          </div>
           <div style="font-size: 0.8rem; color: #f87171; font-weight: 600; margin-top: 4px;">⚠️ Warning: Only works on version 1.14 save files.</div>
         </div>
       </div>
@@ -224,6 +227,19 @@ app.innerHTML = `
       </div>
     </div>
     <div id="toast-container" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
+    
+    <!-- Ko-fi Modal -->
+    <div id="kofi-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 10000;">
+      <div style="background: #1e293b; border: 1px solid #475569; border-radius: 12px; width: 380px; max-width: 90vw; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6);">
+        <div style="padding: 12px 16px; background: #0f172a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+          <h3 style="margin: 0; font-size: 1rem; color: #facc15;">☕ Support Jozeton</h3>
+          <button id="btn-close-kofi" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem;">✕</button>
+        </div>
+        <div style="padding: 0; height: 550px; overflow-y: auto; background: #f9f9f9;">
+          <iframe id='kofiframe' src='https://ko-fi.com/jozeton/?hidefeed=true&widget=true&embed=true&preview=true' style='border:none;width:100%;padding:4px;background:#f9f9f9;' height='712' title='jozeton'></iframe>
+        </div>
+      </div>
+    </div>
   </div>
 `;
 
@@ -282,6 +298,21 @@ const btnCancelBag = document.getElementById('btn-cancel-bag')!;
 const btnSaveBag = document.getElementById('btn-save-bag')!;
 const bagSlotsContainer = document.getElementById('bag-slots-container')!;
 const bagPocketCounter = document.getElementById('bag-pocket-counter')!;
+const kofiModal = document.getElementById('kofi-modal')!;
+const btnKofi = document.getElementById('btn-kofi')!;
+const btnCloseKofi = document.getElementById('btn-close-kofi')!;
+
+btnKofi.addEventListener('click', () => {
+  kofiModal.style.display = 'flex';
+});
+
+btnCloseKofi.addEventListener('click', () => {
+  kofiModal.style.display = 'none';
+});
+
+kofiModal.addEventListener('click', (e) => {
+  if (e.target === kofiModal) kofiModal.style.display = 'none';
+});
 
 let tempPocketItems: { [p: string]: BagItem[] } = {};
 
