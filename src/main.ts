@@ -27,6 +27,7 @@ import { CONSTANTS } from './engine/constants';
 let currentSave: SoulGoldSave | null = null;
 let currentBox: number = 0;
 let inspectingSlot: { type: 'party' | 'box'; index: number } | null = null;
+let inspectingMon: DecryptedPokemon | null = null;
 let slotPendingCreation: { type: 'party' | 'box'; index: number } | null = null;
 let activeBagPocket: PocketType = 'Items';
 
@@ -83,7 +84,10 @@ function makePersonalityNonShiny(currentPid: number, otId: number): number {
 }
 
 function setPersonalityNature(currentPid: number, targetNature: number): number {
-  const base = currentPid - (currentPid % 25);
+  let base = currentPid - (currentPid % 25);
+  if (base + targetNature > 0xFFFFFFFF) {
+    base -= 25;
+  }
   return (base + targetNature) >>> 0;
 }
 
@@ -342,6 +346,7 @@ async function handleFile(file: File) {
   currentSave = new SoulGoldSave(buffer);
   currentBox = 0;
   inspectingSlot = null;
+  inspectingMon = null;
   slotPendingCreation = null;
   document.getElementById('mon-inspector')!.style.display = 'none';
   renderWorkspace();
@@ -515,6 +520,7 @@ function swapOrMovePokemon(
   if (inspectingSlot) {
     document.getElementById('mon-inspector')!.style.display = 'none';
     inspectingSlot = null;
+    inspectingMon = null;
   }
   renderParty();
   renderBox();
@@ -849,8 +855,10 @@ function commitInspectorChanges() {
   const type = inspectingSlot.type;
   const index = inspectingSlot.index;
   const isParty = type === 'party';
-  const mon = isParty ? currentSave.getParty()[index] : currentSave.getBoxPokemon(currentBox, index);
+  const mon = inspectingMon || (isParty ? currentSave.getParty()[index] : currentSave.getBoxPokemon(currentBox, index));
   if (!mon) return;
+
+  const wantShiny = isMonShiny(mon);
 
   const pokeballEl = document.getElementById('edit-pokeball') as HTMLSelectElement;
   const heldItemEl = document.getElementById('edit-held-item') as HTMLSelectElement;
@@ -867,6 +875,15 @@ function commitInspectorChanges() {
   if (natureEl) {
     const natId = parseInt(natureEl.value, 10) || 0;
     mon.personality = setPersonalityNature(mon.personality, natId);
+    if (!isShadowLugiaSpecies(mon.species)) {
+      if (wantShiny) {
+        mon.personality = makePersonalityShiny(mon.personality, mon.otId);
+        mon.shinyModifier = 0;
+      } else if (isMonShiny(mon)) {
+        mon.personality = makePersonalityNonShiny(mon.personality, mon.otId);
+        mon.shinyModifier = 0;
+      }
+    }
   }
 
   for (let i = 0; i < 4; i++) {
@@ -893,6 +910,7 @@ function commitInspectorChanges() {
 }
 
 function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: number) {
+  inspectingMon = mon;
   const inspector = document.getElementById('mon-inspector')!;
   inspector.style.display = 'block';
 
@@ -1051,10 +1069,9 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
       mon.shinyModifier = 0;
     } else {
       mon.personality = makePersonalityShiny(mon.personality, mon.otId);
+      mon.shinyModifier = 0;
     }
     refreshSprite();
-    renderParty();
-    renderBox();
   });
 
   for (let i = 0; i < 4; i++) {
@@ -1120,6 +1137,7 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
   document.getElementById('btn-close-insp')?.addEventListener('click', () => {
     inspector.style.display = 'none';
     inspectingSlot = null;
+    inspectingMon = null;
     renderParty();
     renderBox();
   });
@@ -1149,6 +1167,7 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
 
     inspector.style.display = 'none';
     inspectingSlot = null;
+    inspectingMon = null;
     renderParty();
     renderBox();
   });
