@@ -113,7 +113,7 @@ app.innerHTML = `
             <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 500;">By Jozeton</span>
             <button id="btn-kofi" style="background: #291938; color: #ff5e5b; border: 1px solid #ff5e5b; padding: 2px 10px; border-radius: 12px; cursor: pointer; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">☕ Support on Ko-fi</button>
           </div>
-          <div style="font-size: 0.8rem; color: #f87171; font-weight: 600; margin-top: 4px;">⚠️ Warning: Only works on version 1.14 save files.</div>
+          <div style="font-size: 0.8rem; color: #34d399; font-weight: 600; margin-top: 4px;">✓ Supports SoulGold v1.1.3, v1.1.4, v1.2.0 & v1.2.1 save files (auto-detected).</div>
         </div>
       </div>
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
@@ -127,7 +127,7 @@ app.innerHTML = `
 
     <div id="drop-zone" style="border: 2px dashed #475569; border-radius: 12px; padding: 60px 20px; text-align: center; cursor: pointer; background: #1e293b;">
       <p style="margin: 0; font-size: 1.1rem; color: #e2e8f0;">Drop your <strong>.sav</strong> file here, or click to browse</p>
-      <span style="font-size: 0.8rem; color: #94a3b8;">Supports 128 KB GBA Flash saves (SoulGold v1.14)</span>
+      <span style="font-size: 0.8rem; color: #94a3b8;">Supports 128 KB GBA Flash saves (SoulGold v1.1.3 – v1.2.1)</span>
       <input type="file" id="file-input" accept=".sav" style="display: none;" />
     </div>
 
@@ -361,12 +361,14 @@ function renderWorkspace() {
   btnGlobalApply.style.display = 'inline-block';
   dropZone.style.display = 'none';
 
+  const versionLabel = currentSave.isV12 ? 'v1.2.x (21 Boxes)' : 'v1.1.x (19 Boxes)';
   document.getElementById('trainer-bar')!.innerHTML = `
     <div>
       Trainer: <strong style="color: #60a5fa;">${trainer.name}</strong> 
       <span style="color: #94a3b8; font-size: 0.9rem;">(${trainer.gender})</span> &nbsp;•&nbsp; 
       Money: <strong style="color: #10b981;">$${trainer.money.toLocaleString()}</strong> &nbsp;•&nbsp; 
-      Coins: <strong style="color: #facc15;">${trainer.coins.toLocaleString()}</strong>
+      Coins: <strong style="color: #facc15;">${trainer.coins.toLocaleString()}</strong> &nbsp;•&nbsp;
+      Format: <strong style="color: #c084fc;">${versionLabel}</strong>
     </div>
   `;
   renderParty();
@@ -386,7 +388,9 @@ function renderParty() {
 
 function renderBox() {
   if (!currentSave) return;
-  document.getElementById('box-title')!.textContent = `Box ${currentBox + 1}`;
+  const boxNames = currentSave.getBoxNames();
+  const boxLabel = boxNames[currentBox] || `Box ${currentBox + 1}`;
+  document.getElementById('box-title')!.textContent = `${boxLabel} (${currentBox + 1} / ${currentSave.totalBoxes})`;
   const boxSlots = document.getElementById('box-slots')!;
   boxSlots.innerHTML = '';
   for (let i = 0; i < 30; i++) {
@@ -485,32 +489,33 @@ function swapOrMovePokemon(
     return;
   }
 
+  const isV12 = currentSave.isV12;
   const srcOffset = srcIsParty
     ? CONSTANTS.SB1_PARTY + src.index * CONSTANTS.MON_SIZE
-    : CONSTANTS.STORAGE_BOXES_OFFSET + (src.box * CONSTANTS.BOX_CAPACITY + src.index) * CONSTANTS.BOX_MON_SIZE;
+    : currentSave.getBoxSlotOffset(src.box, src.index);
 
   const destOffset = destIsParty
     ? CONSTANTS.SB1_PARTY + dest.index * CONSTANTS.MON_SIZE
-    : CONSTANTS.STORAGE_BOXES_OFFSET + (dest.box * CONSTANTS.BOX_CAPACITY + dest.index) * CONSTANTS.BOX_MON_SIZE;
+    : currentSave.getBoxSlotOffset(dest.box, dest.index);
 
   const srcBuffer = srcIsParty ? currentSave.sb1 : currentSave.storage;
   const destBuffer = destIsParty ? currentSave.sb1 : currentSave.storage;
 
   if (destMon) {
-    packAndWritePokemon(destBuffer, destOffset, srcMon, destIsParty);
-    packAndWritePokemon(srcBuffer, srcOffset, destMon, srcIsParty);
+    packAndWritePokemon(destBuffer, destOffset, srcMon, destIsParty, isV12);
+    packAndWritePokemon(srcBuffer, srcOffset, destMon, srcIsParty, isV12);
   } else {
-    packAndWritePokemon(destBuffer, destOffset, srcMon, destIsParty);
-    clearPokemonSlot(srcBuffer, srcOffset, srcIsParty);
+    packAndWritePokemon(destBuffer, destOffset, srcMon, destIsParty, isV12);
+    clearPokemonSlot(srcBuffer, srcOffset, srcIsParty, isV12);
 
     if (srcIsParty) {
       const remainingParty = currentSave.getParty();
       for (let i = 0; i < 6; i++) {
         const off = CONSTANTS.SB1_PARTY + i * CONSTANTS.MON_SIZE;
         if (i < remainingParty.length) {
-          packAndWritePokemon(currentSave.sb1, off, remainingParty[i], true);
+          packAndWritePokemon(currentSave.sb1, off, remainingParty[i], true, isV12);
         } else {
-          clearPokemonSlot(currentSave.sb1, off, true);
+          clearPokemonSlot(currentSave.sb1, off, true, isV12);
         }
       }
     }
@@ -562,8 +567,10 @@ function submitAddPokemon() {
     const newMon = createDefaultPokemon(match.id, trainer);
     const isParty = slotPendingCreation.type === 'party';
     const targetBuffer = isParty ? currentSave!.sb1 : currentSave!.storage;
-    const targetOffset = isParty ? CONSTANTS.SB1_PARTY + slotPendingCreation.index * CONSTANTS.MON_SIZE : CONSTANTS.STORAGE_BOXES_OFFSET + (currentBox * CONSTANTS.BOX_CAPACITY + slotPendingCreation.index) * CONSTANTS.BOX_MON_SIZE;
-    packAndWritePokemon(targetBuffer, targetOffset, newMon, isParty);
+    const targetOffset = isParty
+      ? CONSTANTS.SB1_PARTY + slotPendingCreation.index * CONSTANTS.MON_SIZE
+      : currentSave!.getBoxSlotOffset(currentBox, slotPendingCreation.index);
+    packAndWritePokemon(targetBuffer, targetOffset, newMon, isParty, currentSave!.isV12);
     if (isParty) updatePartyCount();
     addModal.style.display = 'none';
     slotPendingCreation = null;
@@ -905,8 +912,8 @@ function commitInspectorChanges() {
   const targetBuffer = isParty ? currentSave.sb1 : currentSave.storage;
   const targetOffset = isParty
     ? CONSTANTS.SB1_PARTY + index * CONSTANTS.MON_SIZE
-    : CONSTANTS.STORAGE_BOXES_OFFSET + (currentBox * CONSTANTS.BOX_CAPACITY + index) * CONSTANTS.BOX_MON_SIZE;
-  packAndWritePokemon(targetBuffer, targetOffset, mon, isParty);
+    : currentSave.getBoxSlotOffset(currentBox, index);
+  packAndWritePokemon(targetBuffer, targetOffset, mon, isParty, currentSave.isV12);
 }
 
 function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: number) {
@@ -1152,8 +1159,10 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
     if (!confirm(`Are you sure you want to release ${mon.nickname || speciesName}?`)) return;
 
     const targetBuffer = isParty ? currentSave.sb1 : currentSave.storage;
-    const targetOffset = isParty ? CONSTANTS.SB1_PARTY + index * CONSTANTS.MON_SIZE : CONSTANTS.STORAGE_BOXES_OFFSET + (currentBox * CONSTANTS.BOX_CAPACITY + index) * CONSTANTS.BOX_MON_SIZE;
-    clearPokemonSlot(targetBuffer, targetOffset, isParty);
+    const targetOffset = isParty
+      ? CONSTANTS.SB1_PARTY + index * CONSTANTS.MON_SIZE
+      : currentSave.getBoxSlotOffset(currentBox, index);
+    clearPokemonSlot(targetBuffer, targetOffset, isParty, currentSave.isV12);
 
     if (isParty) {
       for (let i = index; i < 5; i++) {
@@ -1161,7 +1170,7 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
         const nextOff = CONSTANTS.SB1_PARTY + (i + 1) * CONSTANTS.MON_SIZE;
         currentSave.sb1.set(currentSave.sb1.subarray(nextOff, nextOff + CONSTANTS.MON_SIZE), currOff);
       }
-      clearPokemonSlot(currentSave.sb1, CONSTANTS.SB1_PARTY + 5 * CONSTANTS.MON_SIZE, true);
+      clearPokemonSlot(currentSave.sb1, CONSTANTS.SB1_PARTY + 5 * CONSTANTS.MON_SIZE, true, currentSave.isV12);
       updatePartyCount();
     }
 
@@ -1184,8 +1193,16 @@ function renderInspector(mon: DecryptedPokemon, type: 'party' | 'box', index: nu
   });
 }
 
-btnPrevBox.addEventListener('click', () => { if (currentBox > 0) { currentBox--; renderBox(); } });
-btnNextBox.addEventListener('click', () => { if (currentBox < 13) { currentBox++; renderBox(); } });
+btnPrevBox.addEventListener('click', () => {
+  if (!currentSave) return;
+  currentBox = (currentBox - 1 + currentSave.totalBoxes) % currentSave.totalBoxes;
+  renderBox();
+});
+btnNextBox.addEventListener('click', () => {
+  if (!currentSave) return;
+  currentBox = (currentBox + 1) % currentSave.totalBoxes;
+  renderBox();
+});
 
 function commitActiveModals() {
   if (document.getElementById('mon-inspector')?.style.display !== 'none' && inspectingSlot) {
@@ -1219,7 +1236,7 @@ btnGlobalApply.addEventListener('click', () => {
 btnExport.addEventListener('click', async () => {
   if (!currentSave) return;
   commitActiveModals();
-  const updatedBuffer = exportUpdatedSave(currentSave.buffer, currentSave.activeSlot, currentSave.sb1, currentSave.sb2, currentSave.storage);
+  const updatedBuffer = exportUpdatedSave(currentSave);
 
   if ('showSaveFilePicker' in window) {
     try {
